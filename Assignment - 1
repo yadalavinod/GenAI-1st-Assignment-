@@ -1,0 +1,78 @@
+!pip install PyPDF2 numpy
+
+import PyPDF2
+import numpy as np
+import os
+
+def read_pdf_text(pdf_path, max_pages=1):
+    reader = PyPDF2.PdfReader(pdf_path)
+    text = ""
+    for i, page in enumerate(reader.pages):
+        if i >= max_pages:
+            break
+        text += page.extract_text() + "\n"
+    return text
+
+def generate_embedding(word, dim):
+    np.random.seed(hash(word) % (2**32))  # deterministic for same word
+    return np.random.rand(dim)
+
+def write_embedding_to_file(file_path, word, embedding):
+    with open(file_path, "a") as f:
+        emb_str = " ".join(map(str, embedding))
+        f.write(f"{word} {emb_str}\n")
+
+def load_embeddings(file_path):
+    embeddings = {}
+    if not os.path.exists(file_path):
+        return embeddings
+    with open(file_path, "r") as f:
+        for line in f:
+            parts = line.strip().split()
+            word = parts[0]
+            emb = np.array(list(map(float, parts[1:])))
+            embeddings[word] = emb
+    return embeddings
+
+emb_file_8d = "embeddings_8d.txt"
+emb_file_16d = "embeddings_16d.txt"
+emb_file_32d = "embeddings_32d.txt"
+
+pdf_path = "/Workspace/Users/dbuser17@meteoros.ai/LabSessions/platts-assessments-methodology-guide.pdf"  # Change to your PDF file
+
+text = read_pdf_text(pdf_path)
+
+# Split text into words
+words = set(text.replace("\n", " ").split())
+
+for word in words:
+    if word.strip() == "":
+        continue
+    emb8 = generate_embedding(word, 8)
+    emb16 = generate_embedding(word, 16)
+    emb32 = generate_embedding(word, 32)
+
+    write_embedding_to_file(emb_file_8d, word, emb8)
+    write_embedding_to_file(emb_file_16d, word, emb16)
+    write_embedding_to_file(emb_file_32d, word, emb32)
+
+embeddings_8d = load_embeddings(emb_file_8d)
+embeddings_16d = load_embeddings(emb_file_16d)
+embeddings_32d = load_embeddings(emb_file_32d)
+
+user_word = input("Platts: ").strip()
+
+def search_and_add(word, dim, file_path, embeddings):
+    if word in embeddings:
+        print(f"Found in {dim}d embeddings: {embeddings[word]}")
+    else:
+        print(f"'{word}' not found in {dim}d embeddings. Creating new embedding.")
+        new_emb = generate_embedding(word, dim)
+        write_embedding_to_file(file_path, word, new_emb)
+        embeddings[word] = new_emb
+        print(f"New {dim}d embedding generated: {new_emb}")
+
+# Search in each dimension
+search_and_add(user_word, 8, emb_file_8d, embeddings_8d)
+search_and_add(user_word, 16, emb_file_16d, embeddings_16d)
+search_and_add(user_word, 32, emb_file_32d, embeddings_32d)
